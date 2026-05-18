@@ -1,38 +1,72 @@
 <div dir="rtl">
 
-# AzadiRelay
+# AzadiRelay — راهنمای کامل راه‌اندازی ارتباط ایران و خارج کشور
 
-**AzadiRelay** برای برقراری ارتباط امن بین ایران و خارج کشور ساخته شده است.
+[![GitHub](https://img.shields.io/badge/GitHub-AzadiRelay-8B1E2D?logo=github)](https://github.com/M0lavi/azadirelay)
 
-با این پروژه شما دو نسخه از برنامه را نصب می‌کنید:
+---
+
+## فهرست مطالب
+
+- [AzadiRelay چیست؟](#azadirelay-چیست)
+- [مسیر کلی ارتباط](#مسیر-کلی-ارتباط)
+- [چیزهایی که قبل از شروع لازم دارید](#چیزهایی-که-قبل-از-شروع-لازم-دارید)
+- [مرحله ۱ — نصب نسخه Internal روی هاست ایران](#مرحله-۱--نصب-نسخه-internal-روی-هاست-ایران)
+- [مرحله ۲ — نصب نسخه External روی هاست خارج کشور](#مرحله-۲--نصب-نسخه-external-روی-هاست-خارج-کشور)
+- [مرحله ۳ — ساخت Cloudflare Worker برای MHR](#مرحله-۳--ساخت-cloudflare-worker-برای-mhr)
+- [مرحله ۴ — ساخت Google Apps Script برای MHR](#مرحله-۴--ساخت-google-apps-script-برای-mhr)
+- [مرحله ۵ — نصب MHR-CFW روی VPS Ubuntu](#مرحله-۵--نصب-mhr-cfw-روی-vps-ubuntu)
+- [مرحله ۶ — تنظیم فایل config.json روی VPS](#مرحله-۶--تنظیم-فایل-configjson-روی-vps)
+- [مرحله ۷ — اجرای MHR روی VPS](#مرحله-۷--اجرای-mhr-روی-vps)
+- [مرحله ۸ — اتصال AzadiRelay Internal به MHR](#مرحله-۸--اتصال-azadirelay-internal-به-mhr)
+- [مرحله ۹ — ساخت Cron Job برای Bridge](#مرحله-۹--ساخت-cron-job-برای-bridge)
+- [مرحله ۱۰ — تست نهایی ارتباط](#مرحله-۱۰--تست-نهایی-ارتباط)
+- [اگر دامنه خارج کشور باز نشد](#اگر-دامنه-خارج-کشور-باز-نشد)
+- [عیب‌یابی](#عیب‌یابی)
+- [چک‌لیست نهایی](#چک‌لیست-نهایی)
+- [نکات امنیتی](#نکات-امنیتی)
+
+---
+
+## AzadiRelay چیست؟
+
+**AzadiRelay** یک پیام‌رسان self-hosted برای برقراری ارتباط امن بین ایران و خارج کشور است.
+
+با این پروژه شما دو نسخه جدا نصب می‌کنید:
 
 - یک نسخه روی **هاست ایران** برای کاربران داخل ایران
 - یک نسخه روی **هاست خارج کشور** برای کاربران خارج کشور
-- یک مسیر **MHR-CFW روی VPS** برای اینکه نسخه داخلی بتواند از مسیر امن و پایدار به نسخه خارجی پیام بفرستد
+- یک مسیر واسط با **MHR-CFW روی VPS Ubuntu** برای عبور درخواست‌های Bridge
 
-کار اصلی پروژه:
+هدف اصلی:
 
 ```text
-ارسال پیام از ایران به خارج کشور و دریافت پاسخ، از مسیر Bridge و MHR-CFW
+ارسال و دریافت پیام بین ایران و خارج کشور از مسیر Relay
 ```
 
 ---
 
-## نقشه مسیر ارتباط
+## مسیر کلی ارتباط
 
 ```text
 کاربر داخل ایران
-    ↓
-AzadiRelay Internal روی هاست ایران
-    ↓
-MHR-CFW روی VPS Ubuntu  →  پورت 8085
-    ↓
+    │
+    ▼
+AzadiRelay Internal
+    │
+    ▼
+MHR-CFW روی VPS Ubuntu
+    │
+    ▼
 Google Apps Script
-    ↓
-Cloudflare Worker مربوط به MHR
-    ↓
-AzadiRelay External / Global روی هاست خارج کشور
-    ↓
+    │
+    ▼
+Cloudflare Worker
+    │
+    ▼
+AzadiRelay External / Global
+    │
+    ▼
 کاربر خارج کشور
 ```
 
@@ -42,162 +76,201 @@ AzadiRelay External / Global روی هاست خارج کشور
 8085
 ```
 
-لینک‌های دانلود فایل‌های MHR در این آموزش از مسیر داخلی زیر استفاده می‌کنند:
+یعنی در پایان، نسخه Internal باید به این آدرس وصل شود:
 
-```text
-https://nakhl.sbs/mhr/
+```php
+'bridge_proxy_url' => 'http://YOUR_VPS_IP:8085',
 ```
-
-اگر فایل‌ها را در مسیر دیگری گذاشتید، فقط همان لینک‌ها را در دستورها عوض کنید.
 
 ---
 
-# 1. قبل از شروع چه چیزهایی لازم است؟
+# چیزهایی که قبل از شروع لازم دارید
 
-## 1.1 هاست ایران
+## ۱. هاست ایران
 
-این هاست محل نصب نسخه داخلی است.
+برای نصب نسخه Internal.
 
-از پشتیبانی هاست ایران بپرسید این موارد فعال باشد:
+قبل از نصب مطمئن شوید هاست ایران این موارد را دارد:
+
+| مورد | لازم است؟ |
+|---|---|
+| PHP 8 یا بالاتر | بله |
+| SQLite | بله |
+| pdo_sqlite | بله |
+| Cron Job | بله |
+| File Manager | بله |
+| SSL | بهتر است داشته باشد |
+
+برای اطمینان از پشتیبانی هاست بپرسید:
 
 ```text
-PHP 8 یا بالاتر
-pdo_sqlite
-sqlite3
-Cron Job
-SSL
-امکان نوشتن فایل توسط PHP
+سلام، آیا روی هاست من PHP pdo_sqlite و sqlite3 فعال است؟
+آیا امکان Cron Job دارم؟
 ```
 
 اگر `pdo_sqlite` فعال نباشد، برنامه به دیتابیس وصل نمی‌شود.
 
-در cPanel معمولاً از این مسیر فعال می‌شود:
+---
 
-```text
-Select PHP Version → Extensions → pdo_sqlite
-```
+## ۲. هاست خارج کشور
 
-اگر این گزینه نبود، به پشتیبانی هاست پیام بدهید:
+برای نصب نسخه External / Global.
 
-```text
-لطفاً افزونه‌های pdo_sqlite و sqlite3 را برای PHP دامنه من فعال کنید.
-```
+این هاست هم باید این موارد را داشته باشد:
+
+| مورد | لازم است؟ |
+|---|---|
+| PHP 8 یا بالاتر | بله |
+| SQLite | بله |
+| pdo_sqlite | بله |
+| SSL | بله |
+| دامنه یا ساب‌دامنه | بله |
+
+اگر دامنه خارج کشور در بعضی کشورها باز نشد، در بخش [اگر دامنه خارج کشور باز نشد](#اگر-دامنه-خارج-کشور-باز-نشد) راهکار گفته شده است.
 
 ---
 
-## 1.2 هاست خارج کشور
+## ۳. VPS Ubuntu
 
-این هاست محل نصب نسخه خارجی / Global است.
-
-برای هاست خارج هم همین موارد لازم است:
-
-```text
-PHP 8 یا بالاتر
-pdo_sqlite
-sqlite3
-SSL
-امکان نوشتن فایل توسط PHP
-```
-
-دامنه خارجی بهتر است معتبر و پایدار باشد. اگر دیدید دامنه خارجی در بعضی کشورها باز نمی‌شود، پایین همین README بخش **ساخت Worker جدا برای دامنه خارجی** را انجام دهید.
-
----
-
-## 1.3 VPS Ubuntu
-
-VPS برای اجرای MHR-CFW است.
+برای اجرای MHR-CFW.
 
 مشخصات پیشنهادی:
 
+| مورد | مقدار پیشنهادی |
+|---|---|
+| سیستم‌عامل | Ubuntu 22.04 یا 24.04 |
+| RAM | حداقل 1GB |
+| CPU | حداقل 1 Core |
+| IP | IPv4 عمومی |
+| دسترسی | root یا sudo |
+| پورت | TCP 8085 باز باشد |
+
+---
+
+## ۴. حساب Cloudflare
+
+برای ساخت Worker.
+
+آدرس:
+
 ```text
-Ubuntu 22.04 یا Ubuntu 24.04
-حداقل 1GB RAM
-IPv4 عمومی
-دسترسی SSH
-باز بودن پورت TCP 8085
+https://dash.cloudflare.com
 ```
 
 ---
 
-## 1.4 حساب Cloudflare و Google
+## ۵. حساب Google
 
-برای MHR به این دو حساب نیاز است:
+برای ساخت Google Apps Script.
+
+آدرس:
 
 ```text
-Cloudflare Account
-Google Account
+https://script.google.com
 ```
-
-Cloudflare برای ساخت Worker استفاده می‌شود.
-Google برای ساخت Apps Script استفاده می‌شود.
 
 ---
 
-# 2. فایل‌هایی که باید داخل GitHub قرار بگیرند
+## ۶. فایل‌های دانلود
 
-ساختار پیشنهادی ریپازیتوری:
+در این آموزش فایل‌ها از لینک داخلی زیر دانلود می‌شوند:
 
 ```text
-azadirelay/
-├── README.md
-├── LICENSE
-├── CONFIG_INTERNAL_EXAMPLE.php
-├── CONFIG_EXTERNAL_EXAMPLE.php
-├── releases/
-│   ├── azadirelay-internal-iran-host.zip
-│   └── azadirelay-external-global-host.zip
-├── mhr/
-│   ├── mhr-cfw-main.zip
-│   ├── worker.js
-│   ├── Code.gs
-│   └── config.example.json
-└── cloudflare/
-    └── azadirelay-global-domain-proxy-worker.js
+https://nakhl.sbs
 ```
 
-فایل‌های MHR را بهتر است روی هاست دانلود خودتان هم بگذارید تا کاربران برای نصب روی VPS از GitHub دانلود نکنند:
+لینک‌های مورد استفاده در آموزش:
 
 ```text
 https://nakhl.sbs/mhr/mhr-cfw-main.zip
 https://nakhl.sbs/mhr/worker.js
 https://nakhl.sbs/mhr/Code.gs
-https://nakhl.sbs/mhr/azadirelay-global-domain-proxy-worker.js
+https://nakhl.sbs/releases/azadirelay-internal.zip
+https://nakhl.sbs/releases/azadirelay-external.zip
+https://nakhl.sbs/cloudflare/azadirelay-global-domain-proxy-worker.js
 ```
 
 ---
 
-# 3. نصب نسخه Internal روی هاست ایران
+# مرحله ۱ — نصب نسخه Internal روی هاست ایران
 
-1. وارد cPanel یا پنل هاست ایران شوید.
-2. وارد **File Manager** شوید.
-3. داخل `public_html` یک پوشه بسازید. مثال:
+نسخه Internal همان نسخه‌ای است که روی هاست ایران نصب می‌شود.
+
+## ۱. ورود به File Manager
+
+وارد کنترل‌پنل هاست ایران شوید.
+
+معمولاً از این مسیر:
+
+```text
+cPanel → File Manager
+```
+
+یا در DirectAdmin:
+
+```text
+File Manager
+```
+
+---
+
+## ۲. ساخت پوشه نصب
+
+داخل `public_html` یک پوشه بسازید.
+
+مثال:
 
 ```text
 azadi
 ```
 
-4. فایل زیر را آپلود کنید:
+مسیر نهایی می‌شود:
 
 ```text
-releases/azadirelay-internal-iran-host.zip
+public_html/azadi
 ```
 
-5. فایل ZIP را Extract کنید.
-6. فایل‌ها باید کنار هم باشند:
+---
+
+## ۳. دانلود یا آپلود فایل نسخه Internal
+
+فایل نسخه Internal از این لینک است:
 
 ```text
-public_html/azadi/index.php
-public_html/azadi/config.php
-public_html/azadi/chat_mw.db
-public_html/azadi/bridge_cron.php
-public_html/azadi/bridge_endpoint.php
+https://nakhl.sbs/releases/azadirelay-internal.zip
+```
+
+اگر هاست شما امکان دانلود مستقیم با URL دارد، از همان استفاده کنید.
+
+اگر ندارد:
+
+1. فایل را با مرورگر دانلود کنید
+2. وارد File Manager شوید
+3. داخل پوشه `azadi` آپلود کنید
+4. روی فایل ZIP بزنید
+5. گزینه **Extract** را بزنید
+
+---
+
+## ۴. چک کردن جای فایل‌ها
+
+بعد از Extract باید فایل‌ها شبیه این باشند:
+
+```text
+azadi/
+├── index.php
+├── config.php
+├── chat_mw.db
+├── bridge_cron.php
+├── bridge_endpoint.php
+├── db_check.php
+└── ...
 ```
 
 مهم‌ترین نکته:
 
 ```text
-chat_mw.db باید کنار index.php باشد.
-نام پوشه مهم نیست.
+index.php و chat_mw.db باید کنار هم باشند.
 ```
 
 درست:
@@ -211,20 +284,22 @@ public_html/azadi/chat_mw.db
 
 ```text
 public_html/azadi/index.php
-public_html/azadi/db/chat_mw.db
+public_html/azadi/database/chat_mw.db
 ```
+
+اسم پوشه مهم نیست. فقط `chat_mw.db` باید کنار `index.php` باشد.
 
 ---
 
-## 3.1 تست دیتابیس نسخه داخلی
+## ۵. تست دیتابیس نسخه Internal
 
-بعد از آپلود، این آدرس را باز کنید:
+این آدرس را باز کنید:
 
 ```text
 https://YOUR-IRAN-DOMAIN/azadi/db_check.php
 ```
 
-اگر همه چیز درست باشد، باید مواردی شبیه این ببینید:
+اگر همه چیز درست باشد باید چنین چیزهایی ببینید:
 
 ```text
 pdo_sqlite: فعال ✅
@@ -235,191 +310,458 @@ pdo_sqlite: فعال ✅
 اتصال و نوشتن دیتابیس موفق بود ✅
 ```
 
-اگر این صفحه سبز نبود، اول مشکل دیتابیس و `pdo_sqlite` را حل کنید؛ بعد سراغ مراحل بعد بروید.
+اگر `pdo_sqlite` غیرفعال بود، در cPanel بروید به:
+
+```text
+Select PHP Version → Extensions
+```
+
+بعد این‌ها را فعال کنید:
+
+```text
+pdo_sqlite
+sqlite3
+```
+
+اگر این گزینه‌ها نبودند، به پشتیبانی هاست پیام بدهید:
+
+```text
+لطفاً افزونه‌های PHP pdo_sqlite و sqlite3 را برای هاست من فعال کنید.
+```
 
 ---
 
-# 4. نصب نسخه External / Global روی هاست خارج کشور
+## ۶. تنظیم config.php نسخه Internal
 
-1. وارد پنل هاست خارج کشور شوید.
-2. داخل `public_html` یک پوشه بسازید. مثال:
-
-```text
-azadi
-```
-
-3. فایل زیر را آپلود کنید:
+در File Manager فایل زیر را باز کنید:
 
 ```text
-releases/azadirelay-external-global-host.zip
+config.php
 ```
 
-4. Extract کنید.
-5. این آدرس را باز کنید:
+در نسخه Internal این موارد را تنظیم کنید.
 
-```text
-https://YOUR-GLOBAL-DOMAIN/azadi/db_check.php
-```
+نمونه:
 
-باید مثل نسخه داخلی وضعیت دیتابیس سبز باشد.
+```php
+<?php
 
----
+return [
 
-# 5. ساخت Cloudflare Worker برای MHR
+    # نوع این نسخه
+    # برای هاست ایران باید internal باشد
+    'role' => 'internal',
 
-این Worker مربوط به خود MHR-CFW است.
+    # آدرس نسخه داخلی روی هاست ایران
+    # آخر آدرس / نگذارید
+    'internal_base_url' => 'https://YOUR-IRAN-DOMAIN/azadi',
 
-## 5.1 ورود به Cloudflare
+    # آدرس نسخه خارجی روی هاست خارج کشور
+    # آخر آدرس / نگذارید
+    'foreign_base_url' => 'https://YOUR-FOREIGN-DOMAIN/azadi',
 
-1. بروید به:
+    # رمز مشترک Bridge
+    # این مقدار باید در Internal و External دقیقاً یکی باشد
+    # این رمز را عمومی نکنید
+    'bridge_secret' => 'PUT_SAME_LONG_BRIDGE_SECRET_HERE',
 
-```text
-https://dash.cloudflare.com
-```
+    # رمز اجرای Cron
+    # این مقدار را طولانی و خصوصی بگذارید
+    'cron_key' => 'PUT_LONG_RANDOM_CRON_KEY_HERE',
 
-2. وارد حساب شوید.
-3. از منوی سمت چپ بروید به:
+    # آدرس MHR روی VPS
+    # فقط در نسخه Internal پر می‌شود
+    # YOUR_VPS_IP را با IP واقعی VPS عوض کنید
+    'bridge_proxy_url' => 'http://YOUR_VPS_IP:8085',
 
-```text
-Compute (Workers) → Workers & Pages
-```
+    # لینک ریپازیتوری پروژه
+    'repository_url' => 'https://github.com/M0lavi/azadirelay',
 
-4. روی **Create** بزنید.
-5. گزینه **Start with Hello World** را انتخاب کنید.
-6. یک نام بگذارید. مثال:
+    # یوزرنیم و رمز پنل ادمین
+    # بعد از نصب واقعی بهتر است تغییر دهید
+    'admin_username' => 'admin',
+    'admin_password' => 'admin',
 
-```text
-azadi-mhr-relay
-```
-
-7. روی **Deploy** بزنید.
-8. بعد از ساخته شدن، روی **Edit code** بزنید.
-9. کل کد پیش‌فرض را پاک کنید.
-10. فایل زیر را باز کنید:
-
-```text
-https://nakhl.sbs/mhr/worker.js
-```
-
-یا اگر از فایل‌های همین ریپو استفاده می‌کنید:
-
-```text
-mhr/worker.js
-```
-
-11. کل کد `worker.js` را داخل Cloudflare paste کنید.
-
----
-
-## 5.2 تغییر آدرس Worker داخل worker.js
-
-داخل کد Worker این خط را پیدا کنید:
-
-```javascript
-const WORKER_URL = "myworker.workers.dev";
-```
-
-آدرس Worker خودتان را جایگزین کنید.
-
-مثال:
-
-```javascript
-const WORKER_URL = "azadi-mhr-relay.USERNAME.workers.dev";
+];
 ```
 
 نکته مهم:
 
 ```text
-اینجا https:// نگذارید.
-فقط hostname را بگذارید.
+bridge_secret در Internal و External باید دقیقاً یکی باشد.
 ```
 
-درست:
+مثال:
 
-```javascript
-const WORKER_URL = "azadi-mhr-relay.USERNAME.workers.dev";
+```php
+'bridge_secret' => 'AzadiRelay_Bridge_2026_X9pQ_private_key',
 ```
 
-اشتباه:
+در هر دو فایل همین را بگذارید.
 
-```javascript
-const WORKER_URL = "https://azadi-mhr-relay.USERNAME.workers.dev";
-```
+---
 
-بعد روی **Deploy** بزنید.
+# مرحله ۲ — نصب نسخه External روی هاست خارج کشور
 
-آدرس کامل Worker را هم نگه دارید، چون در Google Script لازم می‌شود:
+نسخه External همان نسخه‌ای است که روی هاست خارج کشور نصب می‌شود.
+
+## ۱. ورود به File Manager هاست خارج
+
+وارد کنترل‌پنل هاست خارج کشور شوید.
+
+داخل `public_html` یک پوشه بسازید.
+
+مثال:
 
 ```text
-https://azadi-mhr-relay.USERNAME.workers.dev
+azadi
 ```
 
 ---
 
-# 6. ساخت Google Apps Script برای MHR
+## ۲. دانلود یا آپلود نسخه External
 
-1. بروید به:
+فایل نسخه External از این لینک است:
+
+```text
+https://nakhl.sbs/releases/azadirelay-external.zip
+```
+
+روش نصب:
+
+1. فایل ZIP را داخل پوشه `azadi` آپلود کنید
+2. روی ZIP بزنید
+3. گزینه **Extract** را بزنید
+
+بعد از Extract فایل‌ها باید شبیه این باشند:
+
+```text
+azadi/
+├── index.php
+├── config.php
+├── chat_mw.db
+├── bridge_endpoint.php
+├── db_check.php
+└── ...
+```
+
+---
+
+## ۳. تست دیتابیس نسخه External
+
+این آدرس را باز کنید:
+
+```text
+https://YOUR-FOREIGN-DOMAIN/azadi/db_check.php
+```
+
+باید وضعیت دیتابیس سبز باشد.
+
+اگر `pdo_sqlite` فعال نبود، مثل هاست ایران باید از کنترل‌پنل هاست یا پشتیبانی هاست فعال شود.
+
+---
+
+## ۴. تنظیم config.php نسخه External
+
+فایل زیر را باز کنید:
+
+```text
+config.php
+```
+
+نمونه تنظیم درست برای External:
+
+```php
+<?php
+
+return [
+
+    # نوع این نسخه
+    # برای هاست خارج کشور باید foreign باشد
+    'role' => 'foreign',
+
+    # آدرس نسخه داخلی روی هاست ایران
+    # آخر آدرس / نگذارید
+    'internal_base_url' => 'https://YOUR-IRAN-DOMAIN/azadi',
+
+    # آدرس نسخه خارجی روی همین هاست خارج کشور
+    # آخر آدرس / نگذارید
+    'foreign_base_url' => 'https://YOUR-FOREIGN-DOMAIN/azadi',
+
+    # رمز مشترک Bridge
+    # باید دقیقاً همان مقداری باشد که در Internal گذاشتید
+    'bridge_secret' => 'PUT_SAME_LONG_BRIDGE_SECRET_HERE',
+
+    # رمز اجرای Cron
+    # بهتر است همان مقداری باشد که در Internal گذاشتید
+    'cron_key' => 'PUT_LONG_RANDOM_CRON_KEY_HERE',
+
+    # در نسخه External معمولاً خالی می‌ماند
+    # چون مسیر پروکسی برای Internal است
+    'bridge_proxy_url' => '',
+
+    # لینک ریپازیتوری پروژه
+    'repository_url' => 'https://github.com/M0lavi/azadirelay',
+
+    # یوزرنیم و رمز پنل ادمین
+    # بعد از نصب واقعی بهتر است تغییر دهید
+    'admin_username' => 'admin',
+    'admin_password' => 'admin',
+
+];
+```
+
+مهم:
+
+```text
+در External مقدار bridge_proxy_url را خالی بگذارید.
+```
+
+---
+
+# مرحله ۳ — ساخت Cloudflare Worker برای MHR
+
+Cloudflare Worker بخشی از مسیر MHR است.
+
+## ۱. ورود به Cloudflare
+
+وارد این آدرس شوید:
+
+```text
+https://dash.cloudflare.com
+```
+
+اگر حساب ندارید، ثبت‌نام کنید.
+
+---
+
+## ۲. رفتن به Workers
+
+از منوی سمت چپ بروید به:
+
+```text
+Compute (Workers)
+```
+
+بعد روی:
+
+```text
+Workers & Pages
+```
+
+کلیک کنید.
+
+---
+
+## ۳. ساخت Worker جدید
+
+روی دکمه:
+
+```text
+Create
+```
+
+کلیک کنید.
+
+بعد گزینه:
+
+```text
+Start with Hello World
+```
+
+را انتخاب کنید.
+
+یک نام برای Worker بگذارید.
+
+مثال:
+
+```text
+azadi-mhr-worker
+```
+
+بعد روی:
+
+```text
+Deploy
+```
+
+بزنید.
+
+---
+
+## ۴. ویرایش کد Worker
+
+بعد از Deploy، روی:
+
+```text
+Edit code
+```
+
+کلیک کنید.
+
+کد پیش‌فرض را کامل پاک کنید.
+
+در ویندوز:
+
+```text
+Ctrl + A
+Delete
+```
+
+---
+
+## ۵. قرار دادن کد worker.js
+
+کد Worker از این لینک است:
+
+```text
+https://nakhl.sbs/mhr/worker.js
+```
+
+فایل را باز کنید، کل کد را کپی کنید و داخل Cloudflare Worker paste کنید.
+
+---
+
+## ۶. تنظیم آدرس Worker داخل کد
+
+داخل کد این خط را پیدا کنید:
+
+```javascript
+const WORKER_URL = "myworker.workers.dev";
+```
+
+مقدار `myworker.workers.dev` را با آدرس Worker خودتان عوض کنید.
+
+مثال:
+
+```javascript
+const WORKER_URL = "azadi-mhr-worker.YOURNAME.workers.dev";
+```
+
+نکته:
+
+```text
+اینجا معمولاً https:// نمی‌گذارید، فقط دامنه Worker را می‌گذارید.
+```
+
+بعد روی:
+
+```text
+Deploy
+```
+
+کلیک کنید.
+
+---
+
+## ۷. نگه داشتن آدرس Worker
+
+آدرس Worker شما شبیه این است:
+
+```text
+https://azadi-mhr-worker.YOURNAME.workers.dev
+```
+
+این آدرس را نگه دارید؛ در Google Apps Script لازم می‌شود.
+
+---
+
+# مرحله ۴ — ساخت Google Apps Script برای MHR
+
+Google Apps Script بخش بعدی مسیر MHR است.
+
+## ۱. ورود به Google Apps Script
+
+وارد این آدرس شوید:
 
 ```text
 https://script.google.com
 ```
 
-2. روی **New project** بزنید.
-3. کد پیش‌فرض را کامل پاک کنید.
-4. فایل زیر را باز کنید:
+با حساب Google خود وارد شوید.
+
+---
+
+## ۲. ساخت پروژه جدید
+
+روی:
+
+```text
+New project
+```
+
+کلیک کنید.
+
+کد پیش‌فرض را پاک کنید.
+
+کد پیش‌فرض معمولاً این است:
+
+```javascript
+function myFunction() {
+
+}
+```
+
+همه آن را حذف کنید.
+
+---
+
+## ۳. قرار دادن کد Code.gs
+
+کد Apps Script از این لینک است:
 
 ```text
 https://nakhl.sbs/mhr/Code.gs
 ```
 
-یا از ریپو:
-
-```text
-mhr/Code.gs
-```
-
-5. کل کد `Code.gs` را paste کنید.
+فایل را باز کنید، کل کد را کپی کنید و داخل Google Apps Script paste کنید.
 
 ---
 
-## 6.1 تغییر AUTH_KEY و WORKER_URL داخل Code.gs
+## ۴. تنظیم AUTH_KEY و WORKER_URL
 
-داخل `Code.gs` این دو خط را پیدا کنید:
+داخل کد این دو خط را پیدا کنید:
 
 ```javascript
 const AUTH_KEY = "STRONG_SECRET_KEY";
 const WORKER_URL = "https://example.workers.dev";
 ```
 
-برای `AUTH_KEY` یک رمز طولانی بگذارید. مثال:
+حالا `AUTH_KEY` را با یک رمز طولانی عوض کنید.
+
+مثال:
 
 ```javascript
-const AUTH_KEY = "AzadiRelay_MHR_Secret_2026_x9K_ChangeMe";
+const AUTH_KEY = "Azadi_MHR_AUTH_2026_x9Pq_very_secret";
 ```
 
-این رمز را نگه دارید. همین مقدار باید بعداً داخل `config.json` در VPS هم وارد شود.
+این رمز را نگه دارید، چون در `config.json` روی VPS هم باید همین را بگذارید.
 
-برای `WORKER_URL` آدرس کامل Worker خودتان را بگذارید:
+بعد `WORKER_URL` را با آدرس Worker خودتان عوض کنید.
+
+مثال:
 
 ```javascript
-const WORKER_URL = "https://azadi-mhr-relay.USERNAME.workers.dev";
+const WORKER_URL = "https://azadi-mhr-worker.YOURNAME.workers.dev";
 ```
 
-اینجا باید `https://` داشته باشد.
+بعد ذخیره کنید:
 
-درست:
-
-```javascript
-const WORKER_URL = "https://azadi-mhr-relay.USERNAME.workers.dev";
+```text
+Ctrl + S
 ```
-
-بعد ذخیره کنید.
 
 ---
 
-## 6.2 Deploy کردن Google Apps Script به عنوان Web app
+## ۵. Deploy کردن به صورت Web app
 
-از بالای صفحه روی **Deploy** بزنید.
+از بالای صفحه روی:
+
+```text
+Deploy
+```
+
+کلیک کنید.
 
 بعد:
 
@@ -427,15 +769,23 @@ const WORKER_URL = "https://azadi-mhr-relay.USERNAME.workers.dev";
 New deployment
 ```
 
-کنار **Select type** روی آیکن چرخ‌دنده بزنید.
+را بزنید.
 
-گزینه زیر را انتخاب کنید:
+کنار گزینه:
+
+```text
+Select type
+```
+
+روی آیکون چرخ‌دنده بزنید.
+
+بعد انتخاب کنید:
 
 ```text
 Web app
 ```
 
-تنظیمات را اینطور بگذارید:
+تنظیمات را این‌طور بگذارید:
 
 ```text
 Description     : AzadiRelay MHR
@@ -443,62 +793,61 @@ Execute as      : Me
 Who has access  : Anyone
 ```
 
-بعد روی **Deploy** بزنید.
-
-اگر Google اجازه خواست:
+بعد روی:
 
 ```text
-Authorize access
-انتخاب حساب Google
-Advanced
-Go to project
-Allow
+Deploy
 ```
 
-بعد از Deploy، Google یک لینک شبیه این می‌دهد:
-
-```text
-https://script.google.com/macros/s/AKfycbxxxxxxxxxxxxxxxxxxxxxxxx/exec
-```
-
-برای MHR فقط قسمت وسط لازم است:
-
-```text
-AKfycbxxxxxxxxxxxxxxxxxxxxxxxx
-```
-
-یعنی:
-
-```text
-فقط مقدار بعد از /s/ و قبل از /exec را کپی کنید.
-کل لینک را داخل config.json نگذارید.
-```
-
-درست:
-
-```json
-"script_id": "AKfycbxxxxxxxxxxxxxxxxxxxxxxxx"
-```
-
-اشتباه:
-
-```json
-"script_id": "https://script.google.com/macros/s/AKfycbxxxxxxxxxxxxxxxxxxxxxxxx/exec"
-```
+کلیک کنید.
 
 ---
 
-# 7. نصب MHR-CFW روی VPS Ubuntu
+## ۶. تأیید دسترسی Google
 
-در این مرحله از GitHub دانلود نمی‌کنیم. فایل از لینک داخلی دانلود می‌شود:
+اگر Google اجازه خواست:
+
+1. روی **Authorize access** بزنید
+2. حساب Google خود را انتخاب کنید
+3. اگر پیام امنیتی آمد، روی **Advanced** بزنید
+4. روی **Go to project** بزنید
+5. روی **Allow** بزنید
+
+---
+
+## ۷. کپی کردن Deployment ID
+
+بعد از Deploy، یک لینک شبیه این می‌بینید:
 
 ```text
-https://nakhl.sbs/mhr/mhr-cfw-main.zip
+https://script.google.com/macros/s/AKfycbxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/exec
 ```
 
-## 7.1 ورود به VPS
+برای MHR کل لینک لازم نیست.
 
-روی سیستم خودتان ترمینال باز کنید و وارد VPS شوید:
+فقط قسمت وسط را کپی کنید:
+
+```text
+AKfycbxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+یعنی این بخش:
+
+```text
+https://script.google.com/macros/s/[این قسمت]/exec
+```
+
+این مقدار را نگه دارید. در `config.json` باید داخل `script_id` قرار بگیرد.
+
+---
+
+# مرحله ۵ — نصب MHR-CFW روی VPS Ubuntu
+
+در این مرحله MHR روی VPS نصب می‌شود.
+
+## ۱. ورود به VPS
+
+از کامپیوتر خود وارد VPS شوید:
 
 ```bash
 ssh root@YOUR_VPS_IP
@@ -506,18 +855,25 @@ ssh root@YOUR_VPS_IP
 
 به جای `YOUR_VPS_IP` آی‌پی VPS خودتان را بگذارید.
 
+اگر کاربر شما root نیست، با کاربر خود وارد شوید و قبل دستورها `sudo` بگذارید.
+
 ---
 
-## 7.2 نصب ابزارهای لازم
-
-این دستور را کامل بزنید:
+## ۲. آپدیت VPS
 
 ```bash
 apt update && apt upgrade -y
+```
+
+---
+
+## ۳. نصب ابزارهای لازم
+
+```bash
 apt install -y curl wget unzip nano ufw python3 python3-pip python3-venv ca-certificates
 ```
 
-اگر خطای package گرفتید:
+اگر خطا داد:
 
 ```bash
 apt --fix-broken install -y
@@ -528,10 +884,17 @@ apt update
 
 ---
 
-## 7.3 دانلود MHR از nakhl.sbs
+## ۴. رفتن به پوشه opt
 
 ```bash
 cd /opt
+```
+
+---
+
+## ۵. دانلود MHR از لینک داخلی
+
+```bash
 wget https://nakhl.sbs/mhr/mhr-cfw-main.zip -O mhr-cfw-main.zip
 ```
 
@@ -543,7 +906,7 @@ curl -L https://nakhl.sbs/mhr/mhr-cfw-main.zip -o mhr-cfw-main.zip
 
 ---
 
-## 7.4 باز کردن فایل ZIP
+## ۶. استخراج فایل
 
 ```bash
 rm -rf /opt/mhr-cfw /opt/mhr-cfw-main
@@ -552,35 +915,45 @@ mv /opt/mhr-cfw-main /opt/mhr-cfw
 cd /opt/mhr-cfw
 ```
 
-حالا چک کنید فایل‌ها هستند:
+---
+
+## ۷. چک کردن فایل‌ها
 
 ```bash
 ls -la
 ```
 
-باید فایل‌هایی مثل این ببینید:
+باید فایل‌هایی شبیه این ببینید:
 
 ```text
 main.py
 requirements.txt
 config.example.json
 run.sh
-setup.py
-deploy
+deploy/
+src/
+```
+
+اگر این فایل‌ها نبودند، یعنی ZIP درست استخراج نشده یا مسیر پوشه فرق دارد.
+
+---
+
+## ۸. ساخت محیط Python
+
+```bash
+python3 -m venv .venv
 ```
 
 ---
 
-## 7.5 نصب کتابخانه‌های Python
+## ۹. نصب نیازمندی‌ها
 
 ```bash
-cd /opt/mhr-cfw
-python3 -m venv .venv
 .venv/bin/python -m pip install --upgrade pip
 .venv/bin/python -m pip install -r requirements.txt
 ```
 
-اگر نصب packageها مشکل داشت، این دستور را بزنید:
+اگر نصب packageها مشکل داشت:
 
 ```bash
 .venv/bin/python -m pip install -r requirements.txt -i https://mirror-pypi.runflare.com/simple/ --trusted-host mirror-pypi.runflare.com
@@ -588,73 +961,132 @@ python3 -m venv .venv
 
 ---
 
-## 7.6 ساخت config.json
+# مرحله ۶ — تنظیم فایل config.json روی VPS
 
-فایل اصلی نمونه را تغییر ندهید. از روی آن کپی بگیرید:
+## ۱. ساخت config.json
+
+داخل پوشه MHR باشید:
 
 ```bash
 cd /opt/mhr-cfw
+```
+
+از روی نمونه، فایل config بسازید:
+
+```bash
 cp config.example.json config.json
+```
+
+---
+
+## ۲. باز کردن config.json
+
+```bash
 nano config.json
 ```
 
-داخل `config.json` فقط همین مقدارهای موجود را تغییر دهید. خط جدید اضافه نکنید.
+---
 
-این مقدار را پیدا کنید:
+## ۳. تنظیم script_id
 
-```json
-"script_id": "YOUR_APPS_SCRIPT_DEPLOYMENT_ID"
-```
-
-به این شکل تغییر دهید:
+داخل فایل دنبال این قسمت بگردید:
 
 ```json
-"script_id": "AKfycbxxxxxxxxxxxxxxxxxxxxxxxx"
+"script_id": ""
 ```
 
-این همان مقدار Google Apps Script است؛ فقط `AKfycb...`، نه کل لینک.
+یا اگر مقدار نمونه داشت، همان را تغییر دهید.
 
-بعد این مقدار را پیدا کنید:
+مقدار `AKfycb...` که از Google Apps Script گرفتید را اینجا بگذارید.
+
+مثال:
 
 ```json
-"auth_key": "CHANGE_ME_TO_A_STRONG_SECRET"
+"script_id": "AKfycbxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 ```
 
-همان رمزی را بگذارید که داخل `Code.gs` برای `AUTH_KEY` گذاشتید:
+نکته:
+
+```text
+اینجا فقط AKfycb... را بگذارید، نه لینک کامل Google Script.
+```
+
+درست:
 
 ```json
-"auth_key": "AzadiRelay_MHR_Secret_2026_x9K_ChangeMe"
+"script_id": "AKfycbxxxxxxxxxxxxxxxx"
 ```
 
-بعد این مقدار را پیدا کنید:
+اشتباه:
+
+```json
+"script_id": "https://script.google.com/macros/s/AKfycbxxxxxxxxxxxxxxxx/exec"
+```
+
+---
+
+## ۴. تنظیم auth_key
+
+داخل فایل دنبال این قسمت بگردید:
+
+```json
+"auth_key": ""
+```
+
+مقدار آن باید دقیقاً همان `AUTH_KEY` باشد که داخل `Code.gs` گذاشتید.
+
+مثال:
+
+```json
+"auth_key": "Azadi_MHR_AUTH_2026_x9Pq_very_secret"
+```
+
+اگر حتی یک حرف فرق داشته باشد، MHR کار نمی‌کند.
+
+---
+
+## ۵. تنظیم listen_host
+
+داخل فایل دنبال این قسمت بگردید:
 
 ```json
 "listen_host": "127.0.0.1"
 ```
 
-و به این تغییر دهید:
+آن را به این تغییر دهید:
 
 ```json
 "listen_host": "0.0.0.0"
 ```
 
-پورت را هم چک کنید:
+مهم:
+
+```text
+اگر 127.0.0.1 باشد، فقط خود VPS می‌تواند به MHR وصل شود.
+اگر 0.0.0.0 باشد، هاست ایران هم می‌تواند به آن وصل شود.
+```
+
+---
+
+## ۶. تنظیم listen_port
+
+داخل فایل دنبال این قسمت بگردید:
 
 ```json
 "listen_port": 8085
 ```
 
-اگر همین بود، دست نزنید. اگر نبود، روی `8085` بگذارید.
+اگر عدد دیگری بود، آن را روی 8085 بگذارید:
 
-نکته خیلی مهم:
-
-```text
-داخل config.json مقدار worker_url اضافه نکنید.
-داخل config.json secret جدید اضافه نکنید.
-فقط همان فیلدهای موجود را ویرایش کنید.
+```json
+"listen_port": 8085
 ```
 
-برای ذخیره در nano:
+---
+
+## ۷. ذخیره فایل در nano
+
+برای ذخیره:
 
 ```text
 Ctrl + O
@@ -664,37 +1096,79 @@ Ctrl + X
 
 ---
 
-# 8. اجرای MHR روی VPS
+## ۸. باز کردن پورت 8085 در فایروال VPS
 
-بعد از تنظیم `config.json`، داخل همان صفحه SSH این دستور را بزنید:
+```bash
+ufw allow OpenSSH
+ufw allow 8085/tcp
+ufw --force enable
+ufw status
+```
+
+باید چیزی شبیه این ببینید:
+
+```text
+8085/tcp ALLOW Anywhere
+```
+
+اگر پنل شرکت VPS هم Firewall جدا دارد، داخل پنل هم پورت TCP `8085` را باز کنید.
+
+---
+
+# مرحله ۷ — اجرای MHR روی VPS
+
+در این آموزش MHR را ساده اجرا می‌کنیم.
+
+یعنی همان صفحه SSH باز می‌ماند و MHR داخل همان صفحه روشن می‌ماند.
+
+## ۱. رفتن به پوشه MHR
 
 ```bash
 cd /opt/mhr-cfw
-.venv/bin/python main.py
 ```
 
-اگر همه چیز درست باشد، خروجی شبیه این می‌بینید:
+---
+
+## ۲. اجرای MHR
+
+```bash
+.venv/bin/python main.py --config /opt/mhr-cfw/config.json
+```
+
+---
+
+## ۳. خروجی موفق
+
+اگر همه چیز درست باشد باید متنی شبیه این ببینید:
 
 ```text
 HTTP proxy listening on 0.0.0.0:8085
 ```
 
-یا در بین لاگ‌ها باید ببینید که proxy روی پورت `8085` روشن شده است.
-
-این صفحه را نبندید.
-
-```text
-تا وقتی این صفحه SSH باز باشد، MHR روشن می‌ماند.
-اگر صفحه را ببندید، Ctrl+C بزنید، یا VPS ریستارت شود، MHR خاموش می‌شود.
-```
-
-اگر خواستید بعداً همیشه بعد از ریبوت هم خودکار روشن شود، می‌توانید برایش سرویس systemd بسازید؛ ولی برای راه‌اندازی ساده، همین باز ماندن صفحه کافی است.
+یا در لاگ‌ها ببینید که پروکسی روی پورت `8085` اجرا شده است.
 
 ---
 
-## 8.1 چک پورت 8085
+## ۴. این صفحه را نبندید
 
-اگر یک SSH دیگر باز کردید، می‌توانید این را بزنید:
+تا وقتی این صفحه SSH باز باشد، MHR روشن می‌ماند.
+
+اگر این کارها را انجام دهید، MHR خاموش می‌شود:
+
+```text
+بستن صفحه SSH
+زدن Ctrl + C
+ریستارت شدن VPS
+خاموش شدن VPS
+```
+
+پس اگر می‌خواهید Relay فعال بماند، این صفحه را باز نگه دارید.
+
+---
+
+## ۵. چک کردن پورت از یک ترمینال دیگر
+
+اگر یک SSH دیگر باز کردید، می‌توانید چک کنید:
 
 ```bash
 ss -lntp | grep 8085
@@ -712,13 +1186,15 @@ ss -lntp | grep 8085
 127.0.0.1:8085
 ```
 
-یعنی `listen_host` اشتباه مانده. دوباره فایل را باز کنید:
+یعنی `listen_host` را درست تغییر نداده‌اید.
+
+دوباره config را باز کنید:
 
 ```bash
 nano /opt/mhr-cfw/config.json
 ```
 
-و این مقدار را درست کنید:
+و مقدار را بگذارید:
 
 ```json
 "listen_host": "0.0.0.0"
@@ -728,79 +1204,41 @@ nano /opt/mhr-cfw/config.json
 
 ---
 
-## 8.2 باز بودن پورت در فایروال VPS
+# مرحله ۸ — اتصال AzadiRelay Internal به MHR
 
-در یک صفحه SSH دیگر این دستورها را بزنید:
+حالا باید نسخه Internal روی هاست ایران را به MHR وصل کنید.
 
-```bash
-ufw allow OpenSSH
-ufw allow 8085/tcp
-ufw --force enable
-ufw status
-```
+## ۱. باز کردن config.php نسخه Internal
 
-باید ببینید:
+در هاست ایران وارد File Manager شوید.
+
+فایل زیر را باز کنید:
 
 ```text
-8085/tcp ALLOW Anywhere
+public_html/azadi/config.php
 ```
-
-اگر شرکت VPS پنل Firewall جدا دارد، داخل پنل VPS هم TCP پورت `8085` را باز کنید.
 
 ---
 
-# 9. تنظیم فایل config.php در نسخه Internal و External
+## ۲. پیدا کردن bridge_proxy_url
 
-## 9.1 رمزهای مشترک
-
-در هر دو نسخه، یعنی هم Internal و هم External، این دو مقدار را بگذارید:
+این خط را پیدا کنید:
 
 ```php
-'bridge_secret' => 'یک رمز طولانی مشترک',
-'cron_key' => 'یک رمز طولانی دیگر',
+'bridge_proxy_url' => '',
 ```
 
-مهم:
-
-```text
-bridge_secret باید در هر دو نسخه دقیقاً یکی باشد.
-cron_key هم بهتر است در هر دو نسخه یکی باشد.
-```
-
-نمونه:
+یا اگر مقدار نمونه دارد:
 
 ```php
-'bridge_secret' => 'AzadiRelay_Bridge_2026_x9K_Private_Secret',
-'cron_key' => 'AzadiRelay_Cron_2026_7pL_Private_Key',
-```
-
-این رمزها را در GitHub یا اسکرین‌شات عمومی قرار ندهید.
-
----
-
-## 9.2 config.php نسخه Internal
-
-روی هاست ایران، فایل زیر را باز کنید:
-
-```text
-config.php
-```
-
-مقادیر اصلی باید شبیه این باشد:
-
-```php
-'role' => 'internal',
-
-'internal_base_url' => 'https://YOUR-IRAN-DOMAIN/azadi',
-'foreign_base_url' => 'https://YOUR-GLOBAL-DOMAIN/azadi',
-
-'bridge_secret' => 'AzadiRelay_Bridge_2026_x9K_Private_Secret',
-'cron_key' => 'AzadiRelay_Cron_2026_7pL_Private_Key',
-
 'bridge_proxy_url' => 'http://YOUR_VPS_IP:8085',
 ```
 
-به جای `YOUR_VPS_IP` آی‌پی VPS را بگذارید.
+---
+
+## ۳. گذاشتن IP واقعی VPS
+
+به جای `YOUR_VPS_IP` آی‌پی VPS خودتان را بگذارید.
 
 مثال:
 
@@ -808,244 +1246,338 @@ config.php
 'bridge_proxy_url' => 'http://123.123.123.123:8085',
 ```
 
----
+مهم:
 
-## 9.3 config.php نسخه External / Global
-
-روی هاست خارج کشور، فایل `config.php` را باز کنید.
-
-مقادیر اصلی باید شبیه این باشد:
-
-```php
-'role' => 'foreign',
-
-'internal_base_url' => 'https://YOUR-IRAN-DOMAIN/azadi',
-'foreign_base_url' => 'https://YOUR-GLOBAL-DOMAIN/azadi',
-
-'bridge_secret' => 'AzadiRelay_Bridge_2026_x9K_Private_Secret',
-'cron_key' => 'AzadiRelay_Cron_2026_7pL_Private_Key',
-
-'bridge_proxy_url' => '',
+```text
+در نسخه Internal این مقدار باید پر باشد.
+در نسخه External این مقدار باید خالی باشد.
 ```
 
-در نسخه خارجی، `bridge_proxy_url` معمولاً خالی می‌ماند.
-
 ---
 
-# 10. تنظیم Cron روی هاست ایران
+# مرحله ۹ — ساخت Cron Job برای Bridge
 
-Bridge باید مرتب اجرا شود تا پیام‌ها جابه‌جا شوند.
+Bridge باید مرتب اجرا شود تا پیام‌ها بین Internal و External رد و بدل شوند.
 
-در cPanel هاست ایران بروید به:
+## ۱. ورود به Cron Jobs
+
+در cPanel بروید به:
 
 ```text
 Cron Jobs
 ```
 
-یک Cron با اجرای هر 1 دقیقه بسازید.
+---
 
-اگر PHP CLI فعال است:
+## ۲. انتخاب اجرای هر یک دقیقه
 
-```bash
-*/1 * * * * php -q /home/USERNAME/public_html/azadi/bridge_cron.php >/dev/null 2>&1
+زمان اجرا را روی هر یک دقیقه بگذارید.
+
+معمولاً شکلش این است:
+
+```text
+Minute: *
+Hour: *
+Day: *
+Month: *
+Weekday: *
 ```
-
-اگر مسیر PHP روی هاست فرق داشت:
-
-```bash
-*/1 * * * * /usr/local/bin/php -q /home/USERNAME/public_html/azadi/bridge_cron.php >/dev/null 2>&1
-```
-
-اگر هاست فقط اجرای URL را اجازه می‌دهد:
-
-```bash
-*/1 * * * * curl -fsS "https://YOUR-IRAN-DOMAIN/azadi/bridge_cron.php?key=YOUR_CRON_KEY" >/dev/null 2>&1
-```
-
-`YOUR_CRON_KEY` همان مقدار `cron_key` داخل `config.php` است.
 
 ---
 
-# 11. اگر دامنه خارجی در بعضی کشورها باز نشد
+## ۳. دستور Cron با PHP
 
-اگر آدرس نسخه خارجی / Global در بعضی کشورها باز نمی‌شود، یک Worker جدا بسازید. این Worker با Worker مربوط به MHR فرق دارد.
+مسیر فایل `bridge_cron.php` را مطابق هاست خودتان بگذارید.
 
-کار این Worker جدا:
+نمونه:
 
-```text
-آدرس Worker را به عنوان آدرس نسخه خارجی استفاده می‌کنید،
-و Worker درخواست‌ها را به هاست خارجی واقعی می‌فرستد.
+```bash
+php -q /home/USERNAME/public_html/azadi/bridge_cron.php >/dev/null 2>&1
 ```
 
-## 11.1 ساخت Worker جدا برای Global
+اگر مسیر PHP روی هاست شما فرق داشت، ممکن است این باشد:
 
-1. وارد Cloudflare شوید:
+```bash
+/usr/local/bin/php -q /home/USERNAME/public_html/azadi/bridge_cron.php >/dev/null 2>&1
+```
+
+اگر مطمئن نیستید، از پشتیبانی هاست بپرسید:
+
+```text
+مسیر کامل PHP CLI برای Cron Job روی هاست من چیست؟
+```
+
+---
+
+## ۴. روش URL اگر PHP CLI کار نکرد
+
+اگر هاست اجازه اجرای PHP CLI نداد، از curl استفاده کنید:
+
+```bash
+curl -fsS "https://YOUR-IRAN-DOMAIN/azadi/bridge_cron.php?key=YOUR_CRON_KEY" >/dev/null 2>&1
+```
+
+`YOUR_CRON_KEY` همان مقداری است که در `config.php` گذاشتید.
+
+مثال:
+
+```php
+'cron_key' => 'Azadi_Cron_2026_Private_Key',
+```
+
+پس URL می‌شود:
+
+```text
+https://YOUR-IRAN-DOMAIN/azadi/bridge_cron.php?key=Azadi_Cron_2026_Private_Key
+```
+
+---
+
+# مرحله ۱۰ — تست نهایی ارتباط
+
+## ۱. تست نسخه Internal
+
+این آدرس را باز کنید:
+
+```text
+https://YOUR-IRAN-DOMAIN/azadi/
+```
+
+یک اکانت بسازید.
+
+---
+
+## ۲. تست نسخه External
+
+این آدرس را باز کنید:
+
+```text
+https://YOUR-FOREIGN-DOMAIN/azadi/
+```
+
+یک اکانت بسازید.
+
+---
+
+## ۳. تست Bridge
+
+از نسخه Internal تلاش کنید به کاربر نسخه External پیام بدهید.
+
+اگر Cron فعال باشد و MHR روشن باشد، پیام باید از مسیر Bridge ارسال شود.
+
+---
+
+## ۴. اگر پیام فوری نرسید
+
+چند دقیقه صبر کنید.
+
+Cron ممکن است هر ۱ دقیقه اجرا شود.
+
+اگر باز هم پیام نرسید، بخش [عیب‌یابی](#عیب‌یابی) را بررسی کنید.
+
+---
+
+# اگر دامنه خارج کشور باز نشد
+
+گاهی ممکن است دامنه نسخه External در بعضی کشورها باز نشود.
+
+در این حالت یک Worker جدا برای دامنه خارجی بسازید.
+
+این Worker برای MHR نیست.  
+این Worker فقط برای کمک به باز شدن دامنه خارجی است.
+
+---
+
+## ۱. ساخت Worker جدید
+
+وارد Cloudflare شوید:
 
 ```text
 https://dash.cloudflare.com
 ```
 
-2. بروید به:
+بروید به:
 
 ```text
 Compute (Workers) → Workers & Pages
 ```
 
-3. روی **Create** بزنید.
-4. **Start with Hello World** را انتخاب کنید.
-5. نام بگذارید. مثال:
+روی:
+
+```text
+Create
+```
+
+بزنید.
+
+گزینه:
+
+```text
+Start with Hello World
+```
+
+را انتخاب کنید.
+
+یک نام بگذارید:
 
 ```text
 azadi-global-proxy
 ```
 
-6. Deploy کنید.
-7. روی **Edit code** بزنید.
-8. کد پیش‌فرض را کامل پاک کنید.
-9. فایل زیر را باز کنید:
+روی:
 
 ```text
-https://nakhl.sbs/mhr/azadirelay-global-domain-proxy-worker.js
+Deploy
 ```
 
-یا از ریپو:
+بزنید.
+
+بعد:
 
 ```text
-cloudflare/azadirelay-global-domain-proxy-worker.js
+Edit code
 ```
 
-10. کد را paste کنید.
+را بزنید.
 
-داخل کد این خط را پیدا کنید:
+---
 
-```javascript
-const ORIGIN_BASE = "https://YOUR-GLOBAL-HOST/azadi";
-```
+## ۲. گذاشتن کد Worker مخصوص دامنه Global
 
-آدرس واقعی نصب Global را بگذارید:
-
-```javascript
-const ORIGIN_BASE = "https://your-real-global-domain.com/azadi";
-```
-
-آخر آدرس `/` نگذارید.
-
-درست:
-
-```javascript
-const ORIGIN_BASE = "https://your-real-global-domain.com/azadi";
-```
-
-اشتباه:
-
-```javascript
-const ORIGIN_BASE = "https://your-real-global-domain.com/azadi/";
-```
-
-بعد **Deploy** کنید.
-
-حالا Worker یک لینک می‌دهد، مثلاً:
+کد از این لینک است:
 
 ```text
-https://azadi-global-proxy.USERNAME.workers.dev
+https://nakhl.sbs/cloudflare/azadirelay-global-domain-proxy-worker.js
 ```
 
-در نسخه Internal، مقدار `foreign_base_url` را به همین Worker تغییر دهید:
+کد پیش‌فرض را کامل پاک کنید و کد بالا را paste کنید.
+
+---
+
+## ۳. تنظیم آدرس دامنه اصلی Global داخل Worker
+
+داخل کد Worker دنبال این قسمت بگردید:
+
+```javascript
+const TARGET = "https://YOUR-FOREIGN-DOMAIN/azadi";
+```
+
+آن را با آدرس واقعی نسخه External عوض کنید.
+
+مثال:
+
+```javascript
+const TARGET = "https://your-global-domain.com/azadi";
+```
+
+بعد روی:
+
+```text
+Deploy
+```
+
+بزنید.
+
+---
+
+## ۴. استفاده از آدرس Worker به جای دامنه خارجی
+
+آدرس Worker شبیه این می‌شود:
+
+```text
+https://azadi-global-proxy.YOURNAME.workers.dev
+```
+
+حالا در `config.php` هر دو نسخه، مقدار `foreign_base_url` را به آدرس Worker تغییر دهید.
+
+در Internal:
 
 ```php
-'foreign_base_url' => 'https://azadi-global-proxy.USERNAME.workers.dev',
+'foreign_base_url' => 'https://azadi-global-proxy.YOURNAME.workers.dev',
 ```
 
-در نسخه External، `foreign_base_url` می‌تواند همان آدرس واقعی هاست خارجی بماند:
+در External هم اگر لازم بود همین مقدار را هماهنگ کنید.
 
-```php
-'foreign_base_url' => 'https://your-real-global-domain.com/azadi',
+نکته:
+
+```text
+اگر آدرس Worker مستقیم به مسیر /azadi وصل شده، آخرش دوباره /azadi اضافه نکنید.
 ```
 
 ---
 
-# 12. تست نهایی
+# عیب‌یابی
 
-## 12.1 تست MHR
+## مشکل ۱ — db_check.php خطای pdo_sqlite می‌دهد
 
-وقتی MHR روی VPS روشن است، روی VPS یا یک سرور دیگر تست کنید:
-
-```bash
-curl -I -x http://YOUR_VPS_IP:8085 https://example.com
-```
-
-اگر header برگشت، پروکسی روشن است.
-
-اگر timeout شد:
+علت:
 
 ```text
-پورت 8085 بسته است
-MHR اجرا نیست
-listen_host هنوز 127.0.0.1 است
-Google Script یا Worker اشتباه تنظیم شده
+افزونه pdo_sqlite روی هاست فعال نیست.
+```
+
+راه‌حل:
+
+```text
+cPanel → Select PHP Version → Extensions → pdo_sqlite
+```
+
+یا به پشتیبانی هاست پیام بدهید:
+
+```text
+لطفاً pdo_sqlite و sqlite3 را فعال کنید.
 ```
 
 ---
 
-## 12.2 تست Bridge
+## مشکل ۲ — فایل دیتابیس writable نیست
 
-روی نسخه Internal این صفحه را باز کنید:
+علت:
 
 ```text
-https://YOUR-IRAN-DOMAIN/azadi/bridge_health.php
+هاست اجازه نوشتن روی chat_mw.db یا پوشه نصب را نمی‌دهد.
 ```
 
-بعد یک کاربر در Internal و یک کاربر در External بسازید و ارسال پیام را تست کنید.
+راه‌حل:
+
+در File Manager سطح دسترسی را بررسی کنید:
+
+```text
+پوشه نصب: 755
+chat_mw.db: 664
+```
+
+اگر باز مشکل داشتید، برای تست موقت:
+
+```text
+chat_mw.db: 666
+```
 
 ---
 
-# 13. خطاهای رایج
+## مشکل ۳ — MHR روشن است ولی AzadiRelay وصل نمی‌شود
 
-## خطای دیتابیس
-
-اگر این پیام را دیدید:
-
-```text
-خطای اتصال پایگاه‌داده
-```
-
-اول این آدرس را باز کنید:
-
-```text
-/db_check.php
-```
-
-اگر `pdo_sqlite` غیرفعال بود، در cPanel فعالش کنید یا به پشتیبانی پیام بدهید.
-
----
-
-## MHR اجرا می‌شود ولی هاست ایران وصل نمی‌شود
-
-چک کنید:
+روی VPS این دستور را بزنید:
 
 ```bash
 ss -lntp | grep 8085
 ```
 
-باید این باشد:
+خروجی درست:
 
 ```text
 0.0.0.0:8085
 ```
 
-اگر این بود:
+اگر خروجی این بود:
 
 ```text
 127.0.0.1:8085
 ```
 
-فایل config را درست کنید:
+یعنی `listen_host` اشتباه است.
 
-```bash
-nano /opt/mhr-cfw/config.json
-```
-
-و بگذارید:
+باید در `config.json` این باشد:
 
 ```json
 "listen_host": "0.0.0.0"
@@ -1053,112 +1585,217 @@ nano /opt/mhr-cfw/config.json
 
 ---
 
-## AUTH_KEY اشتباه است
+## مشکل ۴ — پورت VPS بسته است
 
-این دو مقدار باید دقیقاً یکی باشند:
+روی VPS بزنید:
 
-```text
-AUTH_KEY داخل Code.gs
-auth_key داخل config.json روی VPS
+```bash
+ufw status
 ```
 
-حتی یک فاصله اضافه هم باعث خراب شدن اتصال می‌شود.
+باید ببینید:
+
+```text
+8085/tcp ALLOW
+```
+
+اگر نبود:
+
+```bash
+ufw allow 8085/tcp
+ufw reload
+```
+
+اگر شرکت VPS پنل Firewall دارد، آنجا هم پورت `8085` را باز کنید.
 
 ---
 
-## script_id اشتباه است
+## مشکل ۵ — AUTH_KEY اشتباه است
 
-داخل Google Apps Script لینک کامل شبیه این است:
+علت:
+
+```text
+AUTH_KEY در Code.gs با auth_key در config.json یکی نیست.
+```
+
+باید دقیقاً یکی باشند.
+
+در Code.gs:
+
+```javascript
+const AUTH_KEY = "Azadi_MHR_AUTH_2026_x9Pq_very_secret";
+```
+
+در config.json:
+
+```json
+"auth_key": "Azadi_MHR_AUTH_2026_x9Pq_very_secret"
+```
+
+---
+
+## مشکل ۶ — script_id اشتباه است
+
+اگر MHR خطای script داد، دوباره Google Apps Script را باز کنید.
+
+بروید به:
+
+```text
+Deploy → Manage deployments
+```
+
+لینک Web app را ببینید.
+
+شکل لینک:
 
 ```text
 https://script.google.com/macros/s/AKfycbxxxxxxxxxxxxxxxx/exec
 ```
 
-داخل `config.json` فقط این قسمت را بگذارید:
+فقط این بخش را کپی کنید:
 
 ```text
 AKfycbxxxxxxxxxxxxxxxx
 ```
 
----
+و در `config.json` بگذارید:
 
-## Worker مربوط به MHR اشتباه است
-
-داخل `worker.js` باید `WORKER_URL` بدون `https://` باشد:
-
-```javascript
-const WORKER_URL = "azadi-mhr-relay.USERNAME.workers.dev";
-```
-
-داخل `Code.gs` باید `WORKER_URL` با `https://` باشد:
-
-```javascript
-const WORKER_URL = "https://azadi-mhr-relay.USERNAME.workers.dev";
+```json
+"script_id": "AKfycbxxxxxxxxxxxxxxxx"
 ```
 
 ---
 
-## Cron کار نمی‌کند
+## مشکل ۷ — Worker درست Deploy نشده
 
-چک کنید:
+در Cloudflare بروید به:
 
 ```text
-مسیر bridge_cron.php درست باشد
-cron_key درست باشد
-PHP CLI روی هاست فعال باشد
+Workers & Pages → Worker → Edit code
 ```
 
-اگر PHP CLI کار نکرد، روش curl را استفاده کنید:
+کد را چک کنید.
 
-```bash
-*/1 * * * * curl -fsS "https://YOUR-IRAN-DOMAIN/azadi/bridge_cron.php?key=YOUR_CRON_KEY" >/dev/null 2>&1
+بعد دوباره:
+
+```text
+Deploy
+```
+
+را بزنید.
+
+---
+
+## مشکل ۸ — پیام‌ها رد و بدل نمی‌شوند
+
+این موارد را بررسی کنید:
+
+```text
+MHR روی VPS روشن است
+صفحه SSH بسته نشده است
+bridge_secret در Internal و External یکی است
+foreign_base_url درست است
+bridge_proxy_url در Internal درست است
+bridge_proxy_url در External خالی است
+Cron Job فعال است
+db_check.php روی هر دو هاست سبز است
 ```
 
 ---
 
-# 14. چیزهایی که نباید عمومی شوند
+## مشکل ۹ — صفحه قدیمی یا لوگوی قبلی دیده می‌شود
 
-این موارد را در GitHub، README، عکس، کانال یا گروه عمومی نگذارید:
+مرورگر یا PWA ممکن است کش کرده باشد.
+
+راه‌حل:
+
+```text
+Clear site data
+```
+
+اگر PWA نصب کرده‌اید:
+
+```text
+Uninstall
+```
+
+بعد دوباره سایت را باز کنید.
+
+---
+
+# چک‌لیست نهایی
+
+قبل از استفاده واقعی، این‌ها را چک کنید:
+
+```text
+[ ] نسخه Internal روی هاست ایران نصب شده
+[ ] نسخه External روی هاست خارج نصب شده
+[ ] db_check.php روی هر دو هاست سبز است
+[ ] pdo_sqlite روی هر دو هاست فعال است
+[ ] bridge_secret در هر دو config.php یکی است
+[ ] cron_key تنظیم شده است
+[ ] Cloudflare Worker برای MHR ساخته شده است
+[ ] Google Apps Script به صورت Web app ساخته شده است
+[ ] فقط AKfycb... داخل script_id گذاشته شده است
+[ ] AUTH_KEY در Code.gs و config.json یکی است
+[ ] MHR روی VPS نصب شده است
+[ ] listen_host روی 0.0.0.0 است
+[ ] listen_port روی 8085 است
+[ ] پورت 8085 روی VPS باز است
+[ ] MHR اجرا شده و صفحه SSH باز مانده است
+[ ] bridge_proxy_url در Internal روی http://YOUR_VPS_IP:8085 است
+[ ] bridge_proxy_url در External خالی است
+[ ] Cron Job فعال است
+[ ] پیام از Internal به External تست شده است
+[ ] پیام از External به Internal تست شده است
+```
+
+---
+
+# نکات امنیتی
+
+این موارد را عمومی نکنید:
 
 ```text
 IP واقعی VPS
-AUTH_KEY واقعی MHR
 bridge_secret واقعی
 cron_key واقعی
+AUTH_KEY واقعی MHR
 رمز ادمین واقعی
-آدرس خصوصی Google Script اگر نمی‌خواهید عمومی شود
+آدرس‌های خصوصی نصب
 ```
 
-نمونه‌های داخل README فقط نمونه هستند و باید هنگام نصب عوض شوند.
+برای نصب واقعی، بعد از تست بهتر است رمز ادمین را تغییر دهید:
 
----
+```php
+'admin_username' => 'admin',
+'admin_password' => 'یک رمز قوی',
+```
 
-# 15. چک‌لیست آخر
+نمونه رمز خوب:
 
 ```text
-[ ] نسخه Internal روی هاست ایران نصب شد
-[ ] نسخه External روی هاست خارج نصب شد
-[ ] db_check.php روی هر دو سبز است
-[ ] Cloudflare Worker برای MHR ساخته شد
-[ ] Google Apps Script به صورت Web app ساخته شد
-[ ] فقط AKfycb... داخل config.json گذاشته شد
-[ ] auth_key در config.json با AUTH_KEY در Code.gs یکی است
-[ ] listen_host در config.json برابر 0.0.0.0 است
-[ ] listen_port برابر 8085 است
-[ ] MHR روی VPS اجرا شده و صفحه SSH باز است
-[ ] bridge_proxy_url در Internal برابر http://YOUR_VPS_IP:8085 است
-[ ] bridge_secret در Internal و External یکی است
-[ ] cron_key در Internal و External یکی است
-[ ] Cron روی هاست ایران فعال است
-[ ] اگر دامنه خارجی باز نمی‌شد، Worker جدا برای Global ساخته شد
+Azadi_Admin_2026_X9pQ_private
 ```
 
 ---
 
-## Repository
+# لینک‌های اصلی
 
 ```text
+AzadiRelay:
 https://github.com/M0lavi/azadirelay
+
+فایل‌های دانلود:
+https://nakhl.sbs
 ```
+
+---
+
+## سلب مسئولیت
+
+این پروژه برای استفاده self-hosted، آموزشی و ارتباط خصوصی ارائه شده است.
+
+مسئولیت استفاده، تنظیمات سرور، قوانین محلی، امنیت حساب‌ها، امنیت کلیدها و نگهداری سرویس بر عهده استفاده‌کننده است.
 
 </div>
